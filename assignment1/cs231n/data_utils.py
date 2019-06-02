@@ -5,7 +5,7 @@ import numpy as np
 import os
 try:
     from scipy.misc import imread
-except: ImportError
+except:
     from imageio import imread
 import platform
 
