@@ -186,23 +186,34 @@ class FullyConnectedNet(object):
         # Copy hidden_dims containing the dimentions of every hidden layer and add
         # the input dimention in front. This will help later in loops, as the 
         # indexing convention starts at 1 for weights and bias  
-        hidden_aug = hidden_dims.copy()
-        hidden_aug.insert(0, input_dim)
+        fc_dims = hidden_dims.copy()
+        fc_dims.insert(0, input_dim)
         # Loop through all the hidden layers
         for layer in range(1, self.num_layers):
             # Create key names to store initial weights and biases in params
             weight_name = 'W' + str(layer)
             bias_name = 'b' + str(layer)
+            
+            #for batch normalization
+            gamma_name = 'gamma' + str(layer)
+            beta_name = 'beta' + str(layer)
+            
             # Create weight matrices using the dimentions of the previous layer
             # an the dimention provided in the arguments.
             self.params[weight_name] = np.random.normal(
-                mu, weight_scale, (hidden_aug[layer-1], hidden_aug[layer]))
-            self.params[bias_name] = np.zeros(hidden_aug[layer])
+                mu, weight_scale, (fc_dims[layer-1], fc_dims[layer]))            
+            self.params[bias_name] = np.zeros(fc_dims[layer])
+            #batch normalization
+            if(self.use_batchnorm):
+                self.params[gamma_name] = np.ones(fc_dims[layer])
+                self.params[beta_name] = np.zeros(fc_dims[layer])
 
+            
+        #for the last layer
         weight_name = 'W' + str(self.num_layers)
         bias_name = 'b' + str(self.num_layers)
         self.params[weight_name] = np.random.normal(
-            mu, weight_scale, (hidden_aug[self.num_layers-1], num_classes))
+            mu, weight_scale, (fc_dims[self.num_layers-1], num_classes))
         self.params[bias_name] =np.zeros(num_classes)
 
         ############################################################################
@@ -264,9 +275,22 @@ class FullyConnectedNet(object):
         fwd_pass={0:(X, 0)}
         for layer in range(1, self.num_layers):
             weight_name = 'W' + str(layer)
-            bias_name = 'b' + str(layer)           
-            fwd_pass[layer] = affine_relu_forward(fwd_pass[layer-1][0],\
-                                 self.params[weight_name], self.params[bias_name])
+            bias_name = 'b' + str(layer)
+            gamma_name = 'gamma' + str(layer)
+            beta_name = 'beta' + str(layer)
+            
+            w_tmp = self.params[weight_name]
+            b_tmp = self.params[bias_name]
+
+            
+            if (self.use_batchnorm):
+                gamma_tmp = self.params[gamma_name]
+                beta_tmp = self.params[beta_name]
+                fwd_pass[layer] = affine_bn_relu_forward(fwd_pass[layer-1][0],\
+                                 w_tmp, b_tmp, gamma_tmp, beta_tmp, self.bn_params[layer-1])
+            else:
+                fwd_pass[layer] = affine_relu_forward(fwd_pass[layer-1][0],\
+                                 w_tmp, b_tmp)
         
         weight_name = 'W' + str(layer+1)
         bias_name = 'b' + str(layer+1) 
@@ -312,7 +336,15 @@ class FullyConnectedNet(object):
         for layer in range(self.num_layers-1 , 0, -1):
             weight_name = 'W' + str(layer)
             bias_name = 'b' + str(layer)
-            dl2, grads[weight_name], grads[bias_name] = affine_relu_backward(
+            gamma_name = 'gamma' + str(layer)
+            beta_name = 'beta' + str(layer)
+            
+            if (self.use_batchnorm):
+                dl2, grads[weight_name], grads[bias_name], grads[gamma_name],\
+                grads[beta_name] = affine_bn_relu_backward(dl2, fwd_pass[layer][1])
+
+            else:
+                dl2, grads[weight_name], grads[bias_name] = affine_relu_backward(
                                                         dl2, fwd_pass[layer][1])
         for key, value in grads.items():
             if 'W' in key:
