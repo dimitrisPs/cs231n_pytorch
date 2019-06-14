@@ -233,9 +233,7 @@ class FullyConnectedNet(object):
         # normalization layer. You should pass self.bn_params[0] to the forward pass
         # of the first batch normalization layer, self.bn_params[1] to the forward
         # pass of the second batch normalization layer, etc.
-        self.bn_params = []
-        if self.use_batchnorm:
-            self.bn_params = [{'mode': 'train'} for i in range(self.num_layers - 1)]
+        self.bn_params = [{'mode': 'train'} if self.use_batchnorm  else {} for _ in range(self.num_layers - 1)]
 
         # Cast all parameters to the correct datatype
         for k, v in self.params.items():
@@ -273,24 +271,29 @@ class FullyConnectedNet(object):
         # layer, etc.                                                              #
         ############################################################################
         fwd_pass={0:(X, 0)}
+        gamma_tmp = None
+        beta_tmp = None
         for layer in range(1, self.num_layers):
+            
             weight_name = 'W' + str(layer)
             bias_name = 'b' + str(layer)
-            gamma_name = 'gamma' + str(layer)
-            beta_name = 'beta' + str(layer)
-            
             w_tmp = self.params[weight_name]
             b_tmp = self.params[bias_name]
-
             
-            if (self.use_batchnorm):
+            
+            if self.use_batchnorm:
+                gamma_name = 'gamma' + str(layer)
+                beta_name = 'beta' + str(layer)
                 gamma_tmp = self.params[gamma_name]
                 beta_tmp = self.params[beta_name]
-                fwd_pass[layer] = affine_bn_relu_forward(fwd_pass[layer-1][0],\
-                                 w_tmp, b_tmp, gamma_tmp, beta_tmp, self.bn_params[layer-1])
-            else:
-                fwd_pass[layer] = affine_relu_forward(fwd_pass[layer-1][0],\
-                                 w_tmp, b_tmp)
+            fwd_pass[layer] = affine_generic_forward(fwd_pass[layer-1][0],\
+                                                     w_tmp,\
+                                                     b_tmp,\
+                                                     gamma_tmp,\
+                                                     beta_tmp,\
+                                                     self.bn_params[layer-1],\
+                                                     self.dropout_param)
+
         
         weight_name = 'W' + str(layer+1)
         bias_name = 'b' + str(layer+1) 
@@ -330,22 +333,25 @@ class FullyConnectedNet(object):
         loss =loss + 0.5* self.reg *reg_weights
         
         weight_name = 'W' + str(self.num_layers)
-        bias_name = 'b' + str(self.num_layers)        
+        bias_name = 'b' + str(self.num_layers)
+        
+        
         dl2, grads[weight_name], grads[bias_name] = affine_backward(
                                                 dl2, fwd_pass[self.num_layers][1])
+        
         for layer in range(self.num_layers-1 , 0, -1):
             weight_name = 'W' + str(layer)
             bias_name = 'b' + str(layer)
-            gamma_name = 'gamma' + str(layer)
-            beta_name = 'beta' + str(layer)
             
-            if (self.use_batchnorm):
-                dl2, grads[weight_name], grads[bias_name], grads[gamma_name],\
-                grads[beta_name] = affine_bn_relu_backward(dl2, fwd_pass[layer][1])
+            dl2, grads[weight_name], grads[bias_name], dgamma_tmp, dbeta_tmp =\
+            affine_generic_backward(dl2, fwd_pass[layer][1])
 
-            else:
-                dl2, grads[weight_name], grads[bias_name] = affine_relu_backward(
-                                                        dl2, fwd_pass[layer][1])
+            if (self.use_batchnorm):
+                gamma_name = 'gamma' + str(layer)
+                beta_name = 'beta' + str(layer)
+                grads[gamma_name] = dgamma_tmp
+                grads[beta_name] = dbeta_tmp
+
         for key, value in grads.items():
             if 'W' in key:
                 grads[key] += self.reg * self.params[key]
