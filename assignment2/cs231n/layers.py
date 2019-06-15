@@ -522,7 +522,23 @@ def max_pool_forward_naive(x, pool_param):
     ###########################################################################
     # TODO: Implement the max pooling forward pass                            #
     ###########################################################################
-    pass
+    
+    N, C, H, W = x.shape
+    stride = pool_param['stride']
+    
+    out_rows = H//stride
+    out_cols = W//stride
+    
+    out = np.zeros((N, C, out_rows, out_cols))
+    for exp in range(N):
+        for ch in range(C):
+            for row in range(out_rows):
+                for col in range(out_cols):
+                    out[exp, ch, row, col] = np.max(x[exp,\
+                                                      ch,\
+                                                      row*stride:(1+row)*stride,\
+                                                      col*stride:(1+col)*stride])
+    
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -541,11 +557,26 @@ def max_pool_backward_naive(dout, cache):
     Returns:
     - dx: Gradient with respect to x
     """
+    x, pool_param = cache
+    out_rows, out_cols = dout.shape[2:]
+    N, C, H, W = x.shape
+    stride = pool_param['stride']
     dx = None
     ###########################################################################
     # TODO: Implement the max pooling backward pass                           #
     ###########################################################################
-    pass
+    dx = np.zeros_like(x)
+    
+    for exp in range(N):
+        for ch in range(C):
+            for row in range(out_rows):
+                for col in range(out_cols):
+                    #find the location of the max element in the current x submatrix
+                    max_idx = np.argmax(x[exp, ch, row*stride:(1+row)*stride, col*stride:(1+col)*stride])
+                    #offset and unravel index location 
+                    max_idx = np.asarray(np.unravel_index(max_idx, (stride, stride))) + [row*stride, col*stride]
+                    
+                    dx[exp, ch, max_idx[0], max_idx[1]] = dout[exp, ch, row, col]
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
