@@ -421,11 +421,13 @@ def conv_forward_naive(x, w, b, conv_param):
 
             flt_tmp = w[flt_idx]
             #Convolution
+#             print(padded_example.shape)
             for row in range(flt_h):
                 for col in range(flt_w):
 
                     example_window = padded_example[:, row*stride:row*stride+HH,\
                                                        col*stride:col*stride+WW]
+#                     print((row*stride,row*stride+HH,col*stride,col*stride+WW))
                     tmp_out[row, col] = bias + np.sum(flt_tmp * example_window)
 
             out[example_idx, flt_idx] = np.copy(tmp_out)
@@ -461,42 +463,32 @@ def conv_backward_naive(dout, cache):
     pad = conv_param['pad']
     N, C, H, W = x.shape
     F, C, HH, WW = w.shape
+    out_h, out_w = dout.shape[2:]
         
-    dx = np.zeros_like(x)
+    
     dw = np.zeros_like(w)
-    # check https://medium.com/@2017csm1006/forward-and-backpropagation-in-convolutional-neural-network-4dfa96d7b37e
-    
+#     check https://medium.com/@2017csm1006/forward-and-backpropagation-in-convolutional-neural-network-4dfa96d7b37e
+    dx = np.zeros((N, C, H+(2*pad), W+(2*pad)))   
     for example_idx in range(N):
+
+        tmp_x = x[example_idx]
+        x_pad = ((0,0), (pad, pad), (pad, pad))
+        tmp_x_padded = np.pad(tmp_x, x_pad, 'constant')
+        
         for flt_idx in range(F):
-            for ch_idx in range(C):
-                
-                tmp_flt = w[flt_idx, ch_idx] 
-                tmp_x = x[example_idx, ch_idx] 
-                tmp_dout = dout[example_idx, flt_idx]
-                
-                
-                tmp_dout_pad = np.pad(tmp_dout,pad, 'constant')
-                
-                for row in range(H):
-                    for col in range(W):
-                        
-                        tmp_dout_w = tmp_dout_pad[row*stride:row*stride+HH,\
-                                                   col*stride:col*stride+WW]
 
-                        dx[example_idx, ch_idx, row, col] +=  np.sum(tmp_dout_w * np.flip(tmp_flt))
-                
-                
-                tmp_x_pad = np.pad(tmp_x,pad, 'constant')
-                
-                for row in range(HH):
-                    for col in range(WW):
+                for row in range(out_h):
+                    for col in range(out_w):
+
+                        x_window = tmp_x_padded[:, row*stride:row*stride + HH, col*stride:col*stride + WW]
                         
-                        tmp_x_w = tmp_x_pad[row*stride:row*stride+H,\
-                                                   col*stride:col*stride+W]
-                        dw[flt_idx, ch_idx, row, col] += np.sum(tmp_dout * tmp_x_w)     
+                        dw[flt_idx] += dout[example_idx, flt_idx,row,col] * x_window
+                        dx[example_idx,:, row*stride:row*stride + HH, col*stride:col*stride + WW] += \
+                        dout[example_idx, flt_idx,row,col] * w[flt_idx]
+    dx = dx[:,:,pad:-pad,pad:-pad]
     
-
-    db = [np.sum(dout[:, 0, :, :]), np.sum(dout[:, 1, :, :])]
+   
+    db = np.sum(dout, axis=(0,2,3))
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
