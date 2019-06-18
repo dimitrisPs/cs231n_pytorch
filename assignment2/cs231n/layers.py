@@ -606,11 +606,33 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     # version of batch normalization defined above. Your implementation should#
     # be very short; ours is less than five lines.                            #
     ###########################################################################
-    pass
+    mode = bn_param['mode']
+    eps = bn_param.get('eps', 1e-5)
+    momentum = bn_param.get('momentum',0.9)
+    
+    N, C, H, W = x.shape
+    running_mean = bn_param.get('running_mean', np.zeros((1,C,1,1), dtype=x.dtype))
+    running_var = bn_param.get('running_var', np.zeros((1,C,1,1), dtype=x.dtype))
+    
+    if mode == 'train':
+        
+        sample_mean = np.mean(x, axis = (0,2,3)).reshape(1,C,1,1)
+        sample_var = np.var(x, axis = (0,2,3)).reshape(1,C,1,1)
+
+        running_mean = momentum * running_mean + (1 - momentum) * sample_mean
+        running_var = momentum * running_var + (1 - momentum) * sample_var        
+        x_norm = (x - sample_mean)/(np.sqrt(sample_var + eps))
+        cache = (x, x_norm, gamma.reshape(1,C,1,1) , sample_mean.reshape(1,C,1,1) , sample_var, eps) 
+    else:
+        x_norm = (x - running_mean)/(np.sqrt(running_var + eps))
+
+    out = gamma.reshape(1,C,1,1) * x_norm + beta.reshape(1,C,1,1)
+   
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
-
+    bn_param['running_mean'] = running_mean
+    bn_param['running_var'] = running_var
     return out, cache
 
 
@@ -636,7 +658,31 @@ def spatial_batchnorm_backward(dout, cache):
     # version of batch normalization defined above. Your implementation should#
     # be very short; ours is less than five lines.                            #
     ###########################################################################
-    pass
+    x, x_norm, gamma, sample_mean, sample_var, eps = cache
+    N, C = dout.shape[:2] #num of examples
+    
+    N, C, H, W = dout.shape
+
+    dim = N * H * W
+
+
+    dx_norm = dout * gamma
+    x_centered = x - sample_mean    
+    var_eps = sample_var + eps
+    std = np.sqrt(var_eps)
+    
+    dvar = np.sum(dx_norm * x_centered, axis=(0,2,3)).reshape(1, C, 1, 1) * (-1/(2 * std**3))
+    
+    
+    dmean = np.sum(dx_norm/(-std), axis = (0,2,3)).reshape(1, C, 1, 1) - \
+            dvar * (2) * np.mean( x_centered, axis =(0,2,3)).reshape(1, C, 1, 1)
+
+    
+    dx = dx_norm/std + dvar * (2/dim) * x_centered + dmean/dim
+    #         ok        
+    dgamma = np.sum(dout * x_norm, axis = (0,2,3))
+    
+    dbeta = np.sum(dout, axis = (0,2,3))
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
