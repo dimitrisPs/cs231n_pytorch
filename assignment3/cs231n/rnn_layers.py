@@ -38,7 +38,7 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
 
     next_h = np.tanh(prev_h.dot(Wh) + x.dot(Wx) + b)
     
-    cache = (Wh, Wx, x, prev_h, b)
+    cache = (x, prev_h, Wx, Wh, b)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -71,7 +71,7 @@ def rnn_step_backward(dnext_h, cache):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    Wh, Wx, x, prev_h, b = cache
+    x, prev_h, Wx, Wh, b = cache
     
     tanh_d = 1 - np.tanh(prev_h.dot(Wh) + x.dot(Wx) + b)**2
     
@@ -117,7 +117,18 @@ def rnn_forward(x, h0, Wx, Wh, b):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    prev_h = h0
+    
+    cache ={}
+    
+    (N, T, D) = x.shape
+    H = b.shape[0]
+    h = np.zeros((N, T, H))
+
+    for t in range(T):
+        x_t = x[:,t,:]
+        prev_h, cache[t] = rnn_step_forward(x_t, prev_h, Wx, Wh, b)
+        h[:, t, :] = prev_h
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -152,8 +163,26 @@ def rnn_backward(dh, cache):
     # defined above. You can use a for loop to help compute the backward pass.   #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    
+    N, T, H = dh.shape
+    D = cache[0][0].shape[1]
+    dx = np.zeros((N, T, D))
+    dh_t = np.zeros((N, H))
+    dWx = np.zeros((D, H))
+    dWh = np.zeros((H, H))
+    db = np.zeros(H)
+    
+    
+    for t in range(T-1, -1, -1):
+        dx[:, t, :], dh_t, dWx_t, dWh_t, db_t = rnn_step_backward( dh[:, t, :] + dh_t,
+                                                                  cache[t])
+        
+        dWx += dWx_t
+        dWh += dWh_t
+        db += db_t
+        
+    dh0 = dh_t
 
-    pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
