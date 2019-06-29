@@ -141,9 +141,40 @@ class CaptioningRNN(object):
         # in your implementation, if needed.                                       #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        grads={}
+        #(1)
+        h0, cache_proj = affine_forward(features, W_proj, b_proj)
 
-        pass
+        #(2) has T-1 in size as, caption_in hase T-1 words
+        x_in, e_cache =  word_embedding_forward(captions_in, W_embed)
+        
+        #(3)
+        if (self.cell_type == 'rnn'):
+            h, cache = rnn_forward(x_in, h0, Wx, Wh, b)
+        else:
+            # LSTM Code
+            pass
+        
+        #(4)            
+        out, tmp_cache = temporal_affine_forward(h, W_vocab, b_vocab)
 
+        #(5)
+        loss, dh = temporal_softmax_loss(out, captions_out, mask)
+        
+        
+        # Compute gradients
+        dh, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dh, tmp_cache)
+        
+        
+        dx, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dh, cache)
+        
+        
+        _, grads['W_proj'], grads['b_proj'] = affine_backward(dh0, cache_proj)
+
+        
+        grads['W_embed'] = word_embedding_backward(dx, e_cache)
+
+        
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
