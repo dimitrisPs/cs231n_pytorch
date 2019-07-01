@@ -152,9 +152,7 @@ class CaptioningRNN(object):
         if (self.cell_type == 'rnn'):
             h, cache = rnn_forward(x_in, h0, Wx, Wh, b)
         else:
-            # LSTM Code
-            pass
-        
+            h, cache = lstm_forward(x_in, h0, Wx, Wh, b)
         #(4)            
         out, tmp_cache = temporal_affine_forward(h, W_vocab, b_vocab)
 
@@ -165,9 +163,10 @@ class CaptioningRNN(object):
         # Compute gradients
         dh, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dh, tmp_cache)
         
-        
-        dx, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dh, cache)
-        
+        if (self.cell_type == 'rnn'):
+            dx, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dh, cache)
+        else:
+            dx, dh0, grads['Wx'], grads['Wh'], grads['b'] = lstm_backward(dh, cache)
         
         _, grads['W_proj'], grads['b_proj'] = affine_backward(dh0, cache_proj)
 
@@ -241,8 +240,33 @@ class CaptioningRNN(object):
         # you are using an LSTM, initialize the first cell state to zeros.        #
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        
+        #initialize the first hiddent state from the output of the CNN
+        h, _ = affine_forward(features, W_proj, b_proj)
+        c = np.zeros_like(h)
 
-        pass
+        
+        captions = np.zeros((N, max_length), dtype= np.int)       
+        captions[:, 0] = self.word_to_idx['<START>']
+        
+        x_in = captions[:, 0].reshape(-1,1)
+        
+        for t in range(max_length -1):
+            
+            x_in_emb, _ =  word_embedding_forward(x_in, W_embed)
+            x_in_emb = x_in_emb.reshape(N,-1)
+            
+            if (self.cell_type == 'rnn'):
+                h, _ = rnn_step_forward(x_in_emb, h, Wx, Wh, b)
+            else:
+                h, c, _ = lstm_step_forward(x_in_emb, h, c, Wx, Wh, b)
+                
+            out, _ = affine_forward(h, W_vocab, b_vocab)
+            
+            captions[:, t+1] = np.argmax(out, axis =1)
+            x_in = captions[:, t+1].reshape(N,-1)
+            
+            
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
