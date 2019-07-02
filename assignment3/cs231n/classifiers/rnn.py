@@ -242,6 +242,10 @@ class CaptioningRNN(object):
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         
         #initialize the first hiddent state from the output of the CNN
+        
+        #vocabulary size V
+        V = b_vocab.shape[0]
+        
         h, _ = affine_forward(features, W_proj, b_proj)
         c = np.zeros_like(h)
 
@@ -263,7 +267,14 @@ class CaptioningRNN(object):
                 
             out, _ = affine_forward(h, W_vocab, b_vocab)
             
-            captions[:, t+1] = np.argmax(out, axis =1)
+            # softmax
+            probs = np.exp(out - np.max(out, axis=1, keepdims=True))
+            probs /= np.sum(probs, axis=1, keepdims=True)
+            
+            #sample
+            for sample in range(N):
+                captions[sample, t+1] = np.random.choice(V, p=probs[sample])
+            
             x_in = captions[:, t+1].reshape(N,-1)
             
             
