@@ -3,7 +3,6 @@ import urllib.request, urllib.error, urllib.parse, os, tempfile
 
 import numpy as np
 from PIL import Image
-from scipy.misc import imresize
 
 """
 Utility functions used for viewing and processing images.
